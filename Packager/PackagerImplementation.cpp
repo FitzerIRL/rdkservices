@@ -19,6 +19,8 @@
  
 #include "PackagerImplementation.h"
 
+#include "PackagerExUtils.h"
+
 #if defined (DO_NOT_USE_DEPRECATED_API)
 #include <opkg_cmd.h>
 #else
@@ -118,6 +120,12 @@ namespace Plugin {
     PackagerImplementation::~PackagerImplementation()
     {
         FreeOPKG();
+
+#ifdef USE_THREAD_POOL
+      PackagerExUtils::klllThreadQ(this);
+#endif
+
+        TermPackageDB();
     }
 
     void PackagerImplementation::Register(Exchange::IPackager::INotification* notification)
@@ -294,6 +302,17 @@ namespace Plugin {
         _isSyncing = false;
         for (auto* notification : _notifications) {
             notification->RepositorySynchronize(status);
+        }
+        _adminLock.Unlock();
+    }
+
+    void PackagerImplementation::NotifyIntallStep(Exchange::IPackager::state status, uint32_t task /*= 0*/, string id /* = "" */, int32_t code /*= 0*/)
+    {
+        _adminLock.Lock();
+        _isSyncing = false;
+        for (auto* notification : _notifications)
+        {
+            notification->IntallStep(status, task, id, code);
         }
         _adminLock.Unlock();
     }
